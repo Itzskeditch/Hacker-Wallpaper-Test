@@ -3,45 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Plexus Cyber Landscape</title>
+    <title>3D Cyber Grid Background Only</title>
     <style>
+        /* Forces the canvas to be a clean, zero-margin background layer */
         body, html {
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #030812; /* Deep cyber dark background */
+            background-color: #02050a; /* True deep tech space background */
             height: 100%;
+            width: 100%;
         }
         canvas {
             display: block;
-            position: absolute;
+            position: fixed;
             top: 0;
             left: 0;
-            z-index: 1;
-        }
-        .interface {
-            position: relative;
-            z-index: 2;
-            color: #ff9100;
-            font-family: 'Courier New', Courier, monospace;
-            text-align: center;
-            top: 15%;
-            pointer-events: none;
-            text-shadow: 0 0 8px #ff7b00;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0; /* Keeps it locked at the absolute background layer */
         }
     </style>
 </head>
 <body>
 
-    <div class="interface">
-        <h2>CYBER LAYER CONNECTIONS ACTIVE</h2>
-        <p>Hover to distort the grid mesh topology...</p>
-    </div>
-
-    <canvas id="networkCanvas"></canvas>
+    <!-- No text overlays or elements. Strictly the visual background layer. -->
+    <canvas id="hackerGrid"></canvas>
 
     <script>
-        const canvas = document.getElementById('networkCanvas');
+        const canvas = document.getElementById('hackerGrid');
         const ctx = canvas.getContext('2d');
 
         function resize() {
@@ -51,133 +41,173 @@
         resize();
         window.addEventListener('resize', resize);
 
-        // Network Configuration
+        // Grid Definition Variables
         const points = [];
-        const cols = 26; // Grid columns
-        const rows = 18; // Grid rows
-        const spacingX = canvas.width / (cols - 1);
-        const spacingY = canvas.height / (rows - 1);
+        const cols = 50; 
+        const rows = 40; 
+        
+        // 3D Camera Variables (Locks perspective math into focus)
+        const FOV = 280; 
+        const cameraZ = 380;
+        const pitchAngle = 0.65; // High angle viewing perspective
 
-        // Mouse settings
-        const mouse = { x: null, y: null, radius: 160 };
+        // Mouse Trajectory Settings
+        const mouse = { x: null, y: null, prevX: null, prevY: null, radius: 150, velocity: 0 };
+        
         window.addEventListener('mousemove', (e) => {
+            if (mouse.x !== null) {
+                // Measure speed of cursor to calculate distortion physics intensities
+                mouse.velocity = Math.hypot(e.clientX - mouse.x, e.clientY - mouse.y);
+            }
+            mouse.prevX = mouse.x;
+            mouse.prevY = mouse.y;
             mouse.x = e.clientX;
             mouse.y = e.clientY;
         });
-        window.addEventListener('mouseleave', () => {
-            mouse.x = null;
-            mouse.y = null;
+
+        window.addEventListener('mouseleave', () => { 
+            mouse.x = null; mouse.y = null; 
         });
 
-        // Initialize node coordinates to form a 3D wave plane look
+        // Seed 3D coordinate map structures
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
-                // Base coordinates
-                const baseX = c * spacingX;
-                // Skewing the rows downwards slightly creates a depth perspective layout
-                const baseY = r * spacingY + (Math.sin(c * 0.5) * 20); 
-                
+                // Wide ground coordinates
+                const x3d = (c - cols / 2) * 32;
+                const z3d = (rows - r) * 20; 
+                const baseHeight = -80; // Baseline altitude level
+
                 points.push({
-                    x: baseX,
-                    y: baseY,
-                    baseX: baseX,
-                    baseY: baseY,
-                    // Phase offset for organic slow idle wave motion
-                    phase: Math.random() * Math.PI * 2,
-                    speed: 0.02 + Math.random() * 0.02
+                    x3d: x3d,
+                    y3d: baseHeight,
+                    z3d: z3d,
+                    origX3d: x3d,
+                    origY3d: baseHeight,
+                    origZ3d: z3d,
+                    screenX: 0,
+                    screenY: 0,
+                    waveOffset: Math.random() * Math.PI * 2,
+                    warpVelocity: 0 // Local kinetic structural deformation speed
                 });
             }
         }
 
-        function animate() {
+        // Transforms raw spatial coordinate metrics into a 3D perspective display
+        function project(p) {
+            const cosA = Math.cos(pitchAngle);
+            const sinA = Math.sin(pitchAngle);
+
+            // Matrix pitch tilt rotation math
+            let rotY = p.y3d * cosA - p.z3d * sinA;
+            let rotZ = p.y3d * sinA + p.z3d * cosA;
+
+            rotZ += cameraZ;
+            const scale = FOV / rotZ;
+
+            p.screenX = canvas.width / 2 + p.x3d * scale;
+            p.screenY = canvas.height / 2.2 - rotY * scale;
+        }
+
+        function step() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // 1. Update Positions (Wavy idle behavior + Mouse manipulation)
+            // Decelerate cursor metrics smoothly
+            mouse.velocity *= 0.95;
+
+            // 1. Process physics updates for every junction node
             points.forEach(p => {
-                p.phase += p.speed;
-                // Idle background breathing movement
-                let targetX = p.baseX + Math.sin(p.phase) * 6;
-                let targetY = p.baseY + Math.cos(p.phase) * 12;
+                p.waveOffset += 0.02;
+                
+                // Fine background idle hum vibration matrix
+                let homeHeight = p.origY3d + (Math.sin(p.origX3d * 0.015 + p.waveOffset) * 6);
+                let targetY = homeHeight;
 
-                // Mouse Interaction Logic: Push nodes away or pull them down
+                // Project points ahead to scan 2D mouse proximity boundaries
+                project(p);
+
                 if (mouse.x !== null && mouse.y !== null) {
-                    const dx = targetX - mouse.x;
-                    const dy = targetY - mouse.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const dx = p.screenX - mouse.x;
+                    const dy = p.screenY - mouse.y;
+                    const distance = Math.hypot(dx, dy);
 
-                    if (dist < mouse.radius) {
-                        const force = (mouse.radius - dist) / mouse.radius;
-                        // Magnifies node shift direction relative to your pointer position
-                        targetX += (dx / dist) * force * 35;
-                        targetY += (dy / dist) * force * 45;
+                    if (distance < mouse.radius) {
+                        // Intensity increases based on proximity and mouse kinetic speed 
+                        const proximityFactor = (mouse.radius - distance) / mouse.radius;
+                        const distortionForce = proximityFactor * (40 + Math.min(mouse.velocity * 2, 80));
+                        
+                        // Push grid mesh vertices downward dynamically based on vector force
+                        targetY -= distortionForce;
                     }
                 }
 
-                // Smooth out calculation shifts
-                p.x += (targetX - p.x) * 0.1;
-                p.y += (targetY - p.y) * 0.1;
+                // Apply spring elasticity back toward structural baseline configurations
+                p.warpVelocity += (targetY - p.y3d) * 0.08;
+                p.warpVelocity *= 0.85; // Drag friction force
+                p.y3d += p.warpVelocity;
+
+                // Update calculation sets with spatial transformations
+                project(p);
             });
 
-            // 2. Draw Network Lines (Connecting nodes horizontally and vertically)
-            ctx.lineWidth = 1.2;
+            // 2. Draw Wireframe Mesh Topography Connections
+            ctx.lineWidth = 1.0;
             for (let r = 0; r < rows; r++) {
                 for (let c = 0; c < cols; c++) {
                     const i = r * cols + c;
+                    
+                    // Depth alpha fades cleanly out as points move further towards the horizon line
+                    const depthAlpha = 1 - (points[i].origZ3d / (rows * 20));
+                    if (depthAlpha < 0.05) continue;
 
-                    // Connect to adjacent node on the right
+                    let baseAlpha = depthAlpha * 0.35;
+
+                    // Pull right axis connections
                     if (c < cols - 1) {
-                        drawMeshLine(points[i], points[i + 1]);
+                        ctx.strokeStyle = `rgba(255, 115, 0, ${baseAlpha})`;
+                        ctx.beginPath();
+                        ctx.moveTo(points[i].screenX, points[i].screenY);
+                        ctx.lineTo(points[i + 1].screenX, points[i + 1].screenY);
+                        ctx.stroke();
                     }
-                    // Connect to adjacent node underneath
+                    // Pull back axis connections
                     if (r < rows - 1) {
-                        drawMeshLine(points[i], points[i + cols]);
+                        ctx.strokeStyle = `rgba(255, 136, 0, ${baseAlpha * 0.75})`;
+                        ctx.beginPath();
+                        ctx.moveTo(points[i].screenX, points[i].screenY);
+                        ctx.lineTo(points[i + cols].screenX, points[i + cols].screenY);
+                        ctx.stroke();
                     }
                 }
             }
 
-            // 3. Draw Nodes (Glow points)
+            // 3. Highlight Node Particle Overlays
             points.forEach(p => {
-                let isGlowing = false;
+                const depthAlpha = 1 - (p.origZ3d / (rows * 20));
+                if (depthAlpha < 0.1) return;
+
+                let isNearMouse = false;
                 if (mouse.x !== null && mouse.y !== null) {
-                    const dist = Math.hypot(p.x - mouse.x, p.y - mouse.y);
-                    if (dist < mouse.radius) isGlowing = true;
+                    const distance = Math.hypot(p.screenX - mouse.x, p.screenY - mouse.y);
+                    if (distance < mouse.radius) isNearMouse = true;
                 }
 
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, isGlowing ? 4 : 2, 0, Math.PI * 2);
-                // Glow fields match the orange/amber highlights of the image
-                ctx.fillStyle = isGlowing ? '#ffae00' : '#d16a00';
-                ctx.shadowBlur = isGlowing ? 12 : 0;
-                ctx.shadowColor = '#ff8800';
+                // Interactive points scale visually on high stress values
+                const size = isNearMouse ? 3.0 : depthAlpha * 1.5;
+                ctx.arc(p.screenX, p.screenY, Math.max(0.4, size), 0, Math.PI * 2);
+
+                // Flare elements shift bright electric orange/white near the tracking path
+                ctx.fillStyle = isNearMouse ? '#ffffff' : `rgba(255, 155, 0, ${depthAlpha})`;
+                ctx.shadowBlur = isNearMouse ? 12 : 0;
+                ctx.shadowColor = '#ff5100';
                 ctx.fill();
             });
-            
-            ctx.shadowBlur = 0; // Reset canvas glow states
-            requestAnimationFrame(animate);
+
+            ctx.shadowBlur = 0;
+            requestAnimationFrame(step);
         }
 
-        function drawMeshLine(p1, p2) {
-            let proximityAlpha = 0.12; // Dim default grid line opacity
-            
-            if (mouse.x !== null && mouse.y !== null) {
-                const midX = (p1.x + p2.x) / 2;
-                const midY = (p1.y + p2.y) / 2;
-                const dist = Math.hypot(midX - mouse.x, midY - mouse.y);
-                
-                if (dist < mouse.radius) {
-                    // Lines flare up explicitly if they approach the pointer
-                    proximityAlpha = 0.65 - (dist / mouse.radius) * 0.5;
-                }
-            }
-
-            ctx.strokeStyle = `rgba(255, 136, 0, ${proximityAlpha})`;
-            ctx.beginPath();
-            ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.stroke();
-        }
-
-        animate();
+        step();
     </script>
 </body>
 </html>
