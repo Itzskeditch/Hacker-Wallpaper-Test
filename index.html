@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Hacker Background</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
+            height: 100%;
+            font-family: monospace;
+        }
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        /* Content overlays cleanly on top of the hacker canvas */
+        .content {
+            position: relative;
+            z-index: 2;
+            color: #00ff00;
+            text-align: center;
+            top: 40%;
+            text-shadow: 0 0 10px #00ff00;
+            pointer-events: none; /* Allows mouse to pass through to the canvas */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="content">
+        <h1>SYSTEM INTRUSION DETECTED</h1>
+        <p>Move your mouse to disrupt the digital stream...</p>
+    </div>
+
+    <canvas id="matrixCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('matrixCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Make canvas full screen
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Hacker characters (Binary & Katakana mix)
+        const katakana = "ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ10";
+        const alphabet = katakana.split("");
+
+        const fontSize = 16;
+        let columns = canvas.width / fontSize;
+
+        // Track drop positions for each column
+        const rainDrops = [];
+        for (let x = 0; x < columns; x++) {
+            rainDrops[x] = 1;
+        }
+
+        // Track Mouse Position
+        const mouse = { x: undefined, y: undefined, radius: 100 };
+        window.addEventListener('mousemove', (event) => {
+            mouse.x = event.clientX;
+            mouse.y = event.clientY;
+        });
+
+        // Clear mouse position when it leaves the screen
+        window.addEventListener('mouseleave', () => {
+            mouse.x = undefined;
+            mouse.y = undefined;
+        });
+
+        function draw() {
+            // Semi-transparent black clear to create a trailing/fade effect
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.font = fontSize + 'px monospace';
+
+            for (let i = 0; i < rainDrops.length; i++) {
+                // Determine the X and Y coordinate of the text drop
+                const textX = i * fontSize;
+                const textY = rainDrops[i] * fontSize;
+
+                // Randomly pick a character
+                const text = alphabet[Math.floor(Math.random() * alphabet.length)];
+
+                // INTERACTIVE MOUSE LOGIC:
+                // Check distance between the current code drop and the user's mouse cursor
+                if (mouse.x !== undefined && mouse.y !== undefined) {
+                    const dx = textX - mouse.x;
+                    const dy = textY - mouse.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    // If the code is near the mouse, glow bright blue/white and speed up
+                    if (distance < mouse.radius) {
+                        ctx.fillStyle = '#00ffff'; // Electric cyan highlight
+                        ctx.shadowBlur = 15;
+                        ctx.shadowColor = '#00ffff';
+                    } else {
+                        ctx.fillStyle = '#0F0'; // Standard Matrix green
+                        ctx.shadowBlur = 0;
+                    }
+                } else {
+                    ctx.fillStyle = '#0F0';
+                    ctx.shadowBlur = 0;
+                }
+
+                ctx.fillText(text, textX, textY);
+
+                // Reset drop to the top if it hits the bottom, or randomly to scatter them
+                if (textY > canvas.height && Math.random() > 0.975) {
+                    rainDrops[i] = 0;
+                }
+
+                // Move the drop down the screen
+                rainDrops[i]++;
+            }
+        }
+
+        // Run the animation loop at roughly 30 FPS
+        setInterval(draw, 33);
+    </script>
+</body>
+</html>
