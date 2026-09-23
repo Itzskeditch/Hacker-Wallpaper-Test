@@ -1,3 +1,4 @@
+// Cyber Mainframe Grid Engine - Core Logic with Background Terminal Context
 const canvas = document.getElementById('cyberGrid');
 const ctx = canvas.getContext('2d');
 const termInput = document.getElementById('terminalInput');
@@ -12,40 +13,59 @@ let globalColor = { r: 0, g: 255, b: 180 };
 let waveTime = 0;
 const shockwaves = [];
 
-// Audio Core State Engine
+// Persistent logs displayed transparently inside the background HUD overlay
+const maxConsoleLogs = 10;
+const consoleLogs = [
+    "SECURE MAINFRAME CONNECTION INITIATED...",
+    "AUDIO SUBSYSTEM READY. INTERACTION REQUIRED.",
+    "STATUS: UNLOCKED. TYPE '/' FOR CONSOLE PANEL."
+];
+
+// Web Audio Synthesis Nodes
 let audioCtx = null;
 let humOsc = null;
 let humGain = null;
 
+function addConsoleLog(text) {
+    consoleLogs.push("[" + new Date().toLocaleTimeString() + "] " + text.toUpperCase());
+    if (consoleLogs.length > maxConsoleLogs) {
+        consoleLogs.shift();
+    }
+}
+
 function initAudio() {
     if (audioCtx) return;
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    
-    humOsc = audioCtx.createOscillator();
-    humGain = audioCtx.createGain();
-    
-    humOsc.type = 'triangle';
-    humOsc.frequency.setValueAtTime(55, audioCtx.currentTime);
-    humGain.gain.setValueAtTime(0, audioCtx.currentTime);
-    
-    humOsc.connect(humGain);
-    humGain.connect(audioCtx.destination);
-    humOsc.start();
+    try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        humOsc = audioCtx.createOscillator();
+        humGain = audioCtx.createGain();
+        
+        humOsc.type = 'triangle';
+        humOsc.frequency.setValueAtTime(55, audioCtx.currentTime); 
+        humGain.gain.setValueAtTime(0, audioCtx.currentTime); 
+        
+        humOsc.connect(humGain);
+        humGain.connect(audioCtx.destination);
+        humOsc.start();
+        addConsoleLog("CORE AUDIO SYSTEM ENERGIZED.");
+    } catch(e) {
+        console.error("Audio initialization blocked or unsupported:", e);
+    }
 }
 
 function playShockwaveSound() {
     if (!audioCtx) return;
-    
     const now = audioCtx.currentTime;
     const osc = audioCtx.createOscillator();
     const gainNode = audioCtx.createGain();
     
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, now);
-    osc.frequency.exponentialRampToValueAtTime(110, now + 0.4);
+    osc.frequency.setValueAtTime(880, now); 
+    osc.frequency.exponentialRampToValueAtTime(110, now + 0.4); 
     
     gainNode.gain.setValueAtTime(0.15, now);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.5); 
     
     osc.connect(gainNode);
     gainNode.connect(audioCtx.destination);
@@ -82,14 +102,14 @@ function resize() {
 window.addEventListener('resize', resize);
 
 window.addEventListener('mousemove', (e) => { 
-    initAudio();
+    initAudio(); 
     mouse.x = e.clientX; 
     mouse.y = e.clientY; 
     
     if (audioCtx && humGain) {
         const normalizedY = 1 - (e.clientY / window.innerHeight);
         humOsc.frequency.setTargetAtTime(55 + (normalizedY * 60), audioCtx.currentTime, 0.1);
-        humGain.gain.setTargetAtTime(0.04, audioCtx.currentTime, 0.2);
+        humGain.gain.setTargetAtTime(0.03, audioCtx.currentTime, 0.2);
     }
 });
 
@@ -125,10 +145,29 @@ window.addEventListener('keydown', (e) => {
 });
 
 function processCommand(cmd) {
-    if (cmd === 'wave') activeMode = 'wave';
-    else if (cmd === 'random') activeMode = 'random';
-    else if (cmd === 'reset') { activeMode = 'none'; globalColor = { r: 0, g: 255, b: 180 }; }
-    else if (cmd.startsWith('color ')) parseColor(cmd.replace('color ', ''));
+    if (cmd === 'wave') {
+        activeMode = 'wave';
+        addConsoleLog("MODE UPDATED: WAVE MOTION INTERFACE ACTIVATED.");
+    } else if (cmd === 'random') {
+        activeMode = 'random';
+        addConsoleLog("MODE UPDATED: BROWNIAN JITTER MATRIX ACTIVATED.");
+    } else if (cmd === 'reset') {
+        activeMode = 'none';
+        globalColor = { r: 0, g: 255, b: 180 };
+        addConsoleLog("SYSTEM MASTER PARAMETERS CONFIGURED TO STABLE BASELINE.");
+    } else if (cmd === 'help') {
+        addConsoleLog("--- AVAILABLE TERMINAL CORE PROTOCOLS ---");
+        addConsoleLog("HELP         - DISPLAYS ALL ACCESSIBLE KERNEL UTILITIES.");
+        addConsoleLog("WAVE         - OSCILLATES TOPOLOGY GRAPH VIA SINE EQUATIONS.");
+        addConsoleLog("RANDOM       - SHIFTS INDIVIDUAL NODE VECTORS SPORADICALLY.");
+        addConsoleLog("COLOR [VAL]  - ALTERS GLOW HARMONICS (E.G. RED, CYAN, HEX).");
+        addConsoleLog("RESET        - RESTORES BASE MATRIX STRUCTS AND SEED MODES.");
+    } else if (cmd.startsWith('color ')) {
+        const colorVal = cmd.replace('color ', '');
+        parseColor(colorVal);
+    } else {
+        addConsoleLog("UNKNOWN ROUTINE: '" + cmd + "'. ATTEMPT 'HELP' TO SEE ALL CORE VALUES.");
+    }
 }
 
 function parseColor(val) {
@@ -143,6 +182,9 @@ function parseColor(val) {
         globalColor.r = parseInt(match[0]); 
         globalColor.g = parseInt(match[1]); 
         globalColor.b = parseInt(match[2]);
+        addConsoleLog("COLOR CHANNEL LINKED: RGB(" + globalColor.r + "," + globalColor.g + "," + globalColor.b + ")");
+    } else {
+        addConsoleLog("COLOR INTERPRETATION ERROR. SPECIFY VALID HEX OR STRING CONFIGS.");
     }
 }
 
@@ -151,6 +193,16 @@ function animate() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     waveTime += 0.03;
 
+    // Render Background Terminal HUD Logs
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.font = '13px monospace';
+    ctx.fillStyle = "rgba(" + globalColor.r + ", " + globalColor.g + ", " + globalColor.b + ", 0.4)";
+    for (let i = 0; i < consoleLogs.length; i++) {
+        ctx.fillText(consoleLogs[i], 30, 30 + (i * 20));
+    }
+
+    // Process Shockwaves
     for (let i = shockwaves.length - 1; i >= 0; i--) {
         let sw = shockwaves[i];
         sw.radius += sw.speed;
@@ -164,6 +216,7 @@ function animate() {
         ctx.stroke();
     }
 
+    // Process Mesh Physics
     points.forEach(p => {
         let targetX = p.origX;
         let targetY = p.origY;
@@ -205,15 +258,16 @@ function animate() {
         p.x += p.vx; p.y += p.vy;
     });
 
+    // Draw Grid Connections
     for (let i = 0; i < points.length; i++) {
         const p = points[i];
         if (p.col < cols - 1 && points[i + 1] && points[i + 1].col === p.col + 1) drawLinkLine(p, points[i + 1]);
         if (p.row < rows - 1 && points[i + cols]) drawLinkLine(p, points[i + cols]);
     }
 
+    // Draw Dynamic Nodes
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    
     points.forEach(p => {
         p.charTimer--;
         if (p.charTimer <= 0) {
@@ -239,6 +293,7 @@ function animate() {
         }
     });
 
+    // Draw HUD Tactical Tracking Reticle
     if (mouse.x !== null && mouse.y !== null) {
         const glowRGB = "rgb(" + globalColor.r + ", " + globalColor.g + ", " + globalColor.b + ")";
         
