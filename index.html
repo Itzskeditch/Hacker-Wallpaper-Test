@@ -3,35 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Cyber Grid Background Only</title>
+    <title>Interactive Grab Grid</title>
     <style>
-        /* Forces the canvas to be a clean, zero-margin background layer */
+        /* Forces canvas to fit the exact screen dimensions without scrollbars */
         body, html {
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #02050a; /* True deep tech space background */
-            height: 100%;
-            width: 100%;
+            background-color: #030712; /* Deep space-hacker navy */
+            height: 100vh;
+            width: 100vw;
         }
         canvas {
             display: block;
             position: fixed;
             top: 0;
             left: 0;
-            width: 100vw;
-            height: 100vh;
-            z-index: 0; /* Keeps it locked at the absolute background layer */
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            cursor: grab;
+        }
+        canvas:active {
+            cursor: grabbing; /* Visual feedback when holding click */
         }
     </style>
 </head>
 <body>
 
-    <!-- No text overlays or elements. Strictly the visual background layer. -->
-    <canvas id="hackerGrid"></canvas>
+    <canvas id="topDownGrid"></canvas>
 
     <script>
-        const canvas = document.getElementById('hackerGrid');
+        const canvas = document.getElementById('topDownGrid');
         const ctx = canvas.getContext('2d');
 
         function resize() {
@@ -41,173 +44,142 @@
         resize();
         window.addEventListener('resize', resize);
 
-        // Grid Definition Variables
         const points = [];
-        const cols = 50; 
-        const rows = 40; 
+        const spacing = 35; // Grid density spacing (pixels between lines)
         
-        // 3D Camera Variables (Locks perspective math into focus)
-        const FOV = 280; 
-        const cameraZ = 380;
-        const pitchAngle = 0.65; // High angle viewing perspective
+        // Track mouse states
+        const mouse = { x: null, y: null, isPressed: false, radius: 180 };
 
-        // Mouse Trajectory Settings
-        const mouse = { x: null, y: null, prevX: null, prevY: null, radius: 150, velocity: 0 };
-        
         window.addEventListener('mousemove', (e) => {
-            if (mouse.x !== null) {
-                // Measure speed of cursor to calculate distortion physics intensities
-                mouse.velocity = Math.hypot(e.clientX - mouse.x, e.clientY - mouse.y);
-            }
-            mouse.prevX = mouse.x;
-            mouse.prevY = mouse.y;
             mouse.x = e.clientX;
             mouse.y = e.clientY;
         });
 
-        window.addEventListener('mouseleave', () => { 
-            mouse.x = null; mouse.y = null; 
-        });
+        window.addEventListener('mousedown', () => { mouse.isPressed = true; });
+        window.addEventListener('mouseup', () => { mouse.isPressed = false; });
+        window.addEventListener('mouseleave', () => { mouse.x = null; mouse.y = null; mouse.isPressed = false; });
 
-        // Seed 3D coordinate map structures
+        // Initialize points on a massive 2D matrix layout covering oversized screens
+        const cols = Math.ceil(window.screen.width / spacing) + 4;
+        const rows = Math.ceil(window.screen.height / spacing) + 4;
+
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
-                // Wide ground coordinates
-                const x3d = (c - cols / 2) * 32;
-                const z3d = (rows - r) * 20; 
-                const baseHeight = -80; // Baseline altitude level
+                const startX = (c - 2) * spacing;
+                const startY = (r - 2) * spacing;
 
                 points.push({
-                    x3d: x3d,
-                    y3d: baseHeight,
-                    z3d: z3d,
-                    origX3d: x3d,
-                    origY3d: baseHeight,
-                    origZ3d: z3d,
-                    screenX: 0,
-                    screenY: 0,
-                    waveOffset: Math.random() * Math.PI * 2,
-                    warpVelocity: 0 // Local kinetic structural deformation speed
+                    x: startX,
+                    y: startY,
+                    origX: startX,
+                    origY: startY,
+                    col: c,
+                    row: r,
+                    vx: 0, // Kinetic velocity tracking x
+                    vy: 0  // Kinetic velocity tracking y
                 });
             }
         }
 
-        // Transforms raw spatial coordinate metrics into a 3D perspective display
-        function project(p) {
-            const cosA = Math.cos(pitchAngle);
-            const sinA = Math.sin(pitchAngle);
-
-            // Matrix pitch tilt rotation math
-            let rotY = p.y3d * cosA - p.z3d * sinA;
-            let rotZ = p.y3d * sinA + p.z3d * cosA;
-
-            rotZ += cameraZ;
-            const scale = FOV / rotZ;
-
-            p.screenX = canvas.width / 2 + p.x3d * scale;
-            p.screenY = canvas.height / 2.2 - rotY * scale;
-        }
-
-        function step() {
+        function animate() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Decelerate cursor metrics smoothly
-            mouse.velocity *= 0.95;
 
-            // 1. Process physics updates for every junction node
+            // 1. Process Node Physics 
             points.forEach(p => {
-                p.waveOffset += 0.02;
-                
-                // Fine background idle hum vibration matrix
-                let homeHeight = p.origY3d + (Math.sin(p.origX3d * 0.015 + p.waveOffset) * 6);
-                let targetY = homeHeight;
+                let targetX = p.origX;
+                let targetY = p.origY;
 
-                // Project points ahead to scan 2D mouse proximity boundaries
-                project(p);
+                // Grab logic: Pull node targets toward cursor ONLY if click is held down
+                if (mouse.isPressed && mouse.x !== null && mouse.y !== null) {
+                    const dx = p.x - mouse.x;
+                    const dy = p.y - mouse.y;
+                    const dist = Math.hypot(dx, dy);
 
-                if (mouse.x !== null && mouse.y !== null) {
-                    const dx = p.screenX - mouse.x;
-                    const dy = p.screenY - mouse.y;
-                    const distance = Math.hypot(dx, dy);
-
-                    if (distance < mouse.radius) {
-                        // Intensity increases based on proximity and mouse kinetic speed 
-                        const proximityFactor = (mouse.radius - distance) / mouse.radius;
-                        const distortionForce = proximityFactor * (40 + Math.min(mouse.velocity * 2, 80));
-                        
-                        // Push grid mesh vertices downward dynamically based on vector force
-                        targetY -= distortionForce;
+                    if (dist < mouse.radius) {
+                        const pullStrength = (mouse.radius - dist) / mouse.radius;
+                        // Linearly pulls points directly into the cursor coordinates based on proximity
+                        targetX += (mouse.x - p.x) * pullStrength * 0.85;
+                        targetY += (mouse.y - p.y) * pullStrength * 0.85;
                     }
                 }
 
-                // Apply spring elasticity back toward structural baseline configurations
-                p.warpVelocity += (targetY - p.y3d) * 0.08;
-                p.warpVelocity *= 0.85; // Drag friction force
-                p.y3d += p.warpVelocity;
+                // Spring physics formulas to pull deformed grids back into normal alignment
+                const springForceX = (targetX - p.x) * 0.07;
+                const springForceY = (targetY - p.y) * 0.07;
 
-                // Update calculation sets with spatial transformations
-                project(p);
+                p.vx += springForceX;
+                p.vy += springForceY;
+
+                // Apply drag friction to prevent infinite shaking/wobbles
+                p.vx *= 0.82;
+                p.vy *= 0.82;
+
+                p.x += p.vx;
+                p.y += p.vy;
             });
 
-            // 2. Draw Wireframe Mesh Topography Connections
+            // 2. Draw Wireframe Layout lines
             ctx.lineWidth = 1.0;
-            for (let r = 0; r < rows; r++) {
-                for (let c = 0; c < cols; c++) {
-                    const i = r * cols + c;
-                    
-                    // Depth alpha fades cleanly out as points move further towards the horizon line
-                    const depthAlpha = 1 - (points[i].origZ3d / (rows * 20));
-                    if (depthAlpha < 0.05) continue;
+            for (let i = 0; i < points.length; i++) {
+                const p = points[i];
 
-                    let baseAlpha = depthAlpha * 0.35;
+                // Right horizontal grid lines
+                if (p.col < cols - 1 && points[i + 1]) {
+                    ctx.strokeStyle = getLineStyle(p, points[i + 1]);
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(points[i + 1].x, points[i + 1].y);
+                    ctx.stroke();
+                }
 
-                    // Pull right axis connections
-                    if (c < cols - 1) {
-                        ctx.strokeStyle = `rgba(255, 115, 0, ${baseAlpha})`;
-                        ctx.beginPath();
-                        ctx.moveTo(points[i].screenX, points[i].screenY);
-                        ctx.lineTo(points[i + 1].screenX, points[i + 1].screenY);
-                        ctx.stroke();
-                    }
-                    // Pull back axis connections
-                    if (r < rows - 1) {
-                        ctx.strokeStyle = `rgba(255, 136, 0, ${baseAlpha * 0.75})`;
-                        ctx.beginPath();
-                        ctx.moveTo(points[i].screenX, points[i].screenY);
-                        ctx.lineTo(points[i + cols].screenX, points[i + cols].screenY);
-                        ctx.stroke();
-                    }
+                // Vertical bottom grid lines
+                if (p.row < rows - 1 && points[i + cols]) {
+                    ctx.strokeStyle = getLineStyle(p, points[i + cols]);
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(points[i + cols].x, points[i + cols].y);
+                    ctx.stroke();
                 }
             }
 
-            // 3. Highlight Node Particle Overlays
+            // 3. Highlight Node Corners
             points.forEach(p => {
-                const depthAlpha = 1 - (p.origZ3d / (rows * 20));
-                if (depthAlpha < 0.1) return;
-
-                let isNearMouse = false;
-                if (mouse.x !== null && mouse.y !== null) {
-                    const distance = Math.hypot(p.screenX - mouse.x, p.screenY - mouse.y);
-                    if (distance < mouse.radius) isNearMouse = true;
+                let tensionAlpha = 0.25;
+                if (mouse.isPressed && mouse.x !== null && mouse.y !== null) {
+                    const dist = Math.hypot(p.x - mouse.x, p.y - mouse.y);
+                    if (dist < mouse.radius) {
+                        tensionAlpha = 0.9 - (dist / mouse.radius) * 0.6;
+                    }
                 }
 
                 ctx.beginPath();
-                // Interactive points scale visually on high stress values
-                const size = isNearMouse ? 3.0 : depthAlpha * 1.5;
-                ctx.arc(p.screenX, p.screenY, Math.max(0.4, size), 0, Math.PI * 2);
-
-                // Flare elements shift bright electric orange/white near the tracking path
-                ctx.fillStyle = isNearMouse ? '#ffffff' : `rgba(255, 155, 0, ${depthAlpha})`;
-                ctx.shadowBlur = isNearMouse ? 12 : 0;
-                ctx.shadowColor = '#ff5100';
+                ctx.arc(p.x, p.y, tensionAlpha > 0.4 ? 2.5 : 1.2, 0, Math.PI * 2);
+                ctx.fillStyle = tensionAlpha > 0.4 ? '#ffffff' : `rgba(255, 140, 0, ${tensionAlpha})`;
                 ctx.fill();
             });
 
-            ctx.shadowBlur = 0;
-            requestAnimationFrame(step);
+            requestAnimationFrame(animate);
         }
 
-        step();
+        // Helper to adjust color tension on individual grid strands
+        function getLineStyle(p1, p2) {
+            let baseAlpha = 0.15; // Unmodified background opacity state
+
+            if (mouse.isPressed && mouse.x !== null && mouse.y !== null) {
+                const midX = (p1.x + p2.x) / 2;
+                const midY = (p1.y + p2.y) / 2;
+                const dist = Math.hypot(midX - mouse.x, midY - mouse.y);
+
+                if (dist < mouse.radius) {
+                    const factor = 1 - (dist / mouse.radius);
+                    // Shifts color lines from dark orange to a hot glowing amber/white line matrix
+                    return `rgba(255, ${130 + Math.floor(factor * 125)}, ${Math.floor(factor * 200)}, ${0.15 + factor * 0.65})`;
+                }
+            }
+            return `rgba(255, 120, 0, ${baseAlpha})`;
+        }
+
+        animate();
     </script>
 </body>
 </html>
