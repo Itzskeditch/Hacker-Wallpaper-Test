@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Grab Grid</title>
+    <title>Interactive Terminal Background Grid</title>
     <style>
-        /* Forces canvas to fit the exact screen dimensions without scrollbars */
         body, html {
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #030712; /* Deep space-hacker navy */
+            background-color: #030712; 
             height: 100vh;
             width: 100vw;
         }
@@ -22,20 +21,37 @@
             width: 100%;
             height: 100%;
             z-index: 0;
-            cursor: grab;
+            cursor: none; /* Hides your mouse cursor completely */
         }
-        canvas:active {
-            cursor: grabbing; /* Visual feedback when holding click */
+        /* Hidden input used to capture terminal typing mechanics seamlessly */
+        #terminalInput {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            border: 1px solid currentColor;
+            padding: 8px 12px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            font-weight: bold;
+            outline: none;
+            display: none; /* Only appears when '/' is pressed */
+            z-index: 10;
+            width: 300px;
+            border-radius: 4px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
         }
     </style>
 </head>
 <body>
 
     <canvas id="topDownGrid"></canvas>
+    <input type="text" id="terminalInput" placeholder="Enter command... (wave, random, color, reset)">
 
     <script>
         const canvas = document.getElementById('topDownGrid');
         const ctx = canvas.getContext('2d');
+        const termInput = document.getElementById('terminalInput');
 
         function resize() {
             canvas.width = window.innerWidth;
@@ -44,22 +60,22 @@
         resize();
         window.addEventListener('resize', resize);
 
+        // Core Configuration & States
         const points = [];
-        const spacing = 35; // Grid density spacing (pixels between lines)
-        
-        // Track mouse states
+        const spacing = 35; 
         const mouse = { x: null, y: null, isPressed: false, radius: 180 };
+        
+        // Customization Modes (Controlled by the Terminal)
+        let activeMode = 'none'; // 'none', 'wave', 'random'
+        let globalColor = { r: 255, g: 120, b: 0 }; // Default: Orange
+        let waveTime = 0;
 
-        window.addEventListener('mousemove', (e) => {
-            mouse.x = e.clientX;
-            mouse.y = e.clientY;
-        });
-
-        window.addEventListener('mousedown', () => { mouse.isPressed = true; });
+        window.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
+        window.addEventListener('mousedown', () => { if(termInput.style.display !== 'block') mouse.isPressed = true; });
         window.addEventListener('mouseup', () => { mouse.isPressed = false; });
         window.addEventListener('mouseleave', () => { mouse.x = null; mouse.y = null; mouse.isPressed = false; });
 
-        // Initialize points on a massive 2D matrix layout covering oversized screens
+        // Build the physical grid network
         const cols = Math.ceil(window.screen.width / spacing) + 4;
         const rows = Math.ceil(window.screen.height / spacing) + 4;
 
@@ -67,104 +83,138 @@
             for (let c = 0; c < cols; c++) {
                 const startX = (c - 2) * spacing;
                 const startY = (r - 2) * spacing;
-
                 points.push({
-                    x: startX,
-                    y: startY,
-                    origX: startX,
-                    origY: startY,
-                    col: c,
-                    row: r,
-                    vx: 0, // Kinetic velocity tracking x
-                    vy: 0  // Kinetic velocity tracking y
+                    x: startX, y: startY, origX: startX, origY: startY,
+                    col: c, row: r, vx: 0, vy: 0,
+                    seed: Math.random() * Math.PI * 2 // Seed for random jitter mechanics
                 });
+            }
+        }
+
+        // 🎹 KEYBOARD TERMINAL EVENT LISTENER
+        window.addEventListener('keydown', (e) => {
+            // Press '/' to toggle and open the overlay console command line
+            if (e.key === '/' && termInput.style.display !== 'block') {
+                e.preventDefault();
+                termInput.style.color = `rgb(${globalColor.r}, ${globalColor.g}, ${globalColor.b})`;
+                termInput.style.display = 'block';
+                termInput.value = '';
+                termInput.focus();
+                mouse.isPressed = false; // Prevents dragging artifacts while launching console
+            } 
+            // Press Escape to close the menu instantly
+            else if (e.key === 'Escape' && termInput.style.display === 'block') {
+                termInput.style.display = 'none';
+            }
+            // Press Enter to submit parameters
+            else if (e.key === 'Enter' && termInput.style.display === 'block') {
+                processCommand(termInput.value.trim().toLowerCase());
+                termInput.style.display = 'none';
+            }
+        });
+
+        function processCommand(cmd) {
+            if (cmd === 'wave') {
+                activeMode = 'wave';
+            } else if (cmd === 'random') {
+                activeMode = 'random';
+            } else if (cmd === 'reset') {
+                activeMode = 'none';
+                globalColor = { r: 255, g: 120, b: 0 }; // Default Orange
+            } else if (cmd.startsWith('color ')) {
+                // Accepts hex (#ff0000), names (green, purple, red, cyan), or rgb values
+                const arg = cmd.replace('color ', '');
+                parseColor(arg);
+            }
+        }
+
+        function parseColor(val) {
+            const dummy = document.createElement('div');
+            dummy.style.color = val;
+            document.body.appendChild(dummy);
+            const computed = window.getComputedStyle(dummy).color; // Extracts as clean "rgb(r, g, b)"
+            document.body.removeChild(dummy);
+            
+            const match = computed.match(/\d+/g);
+            if (match && match.length >= 3) {
+                globalColor.r = parseInt(match[0]);
+                globalColor.g = parseInt(match[1]);
+                globalColor.b = parseInt(match[2]);
             }
         }
 
         function animate() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            waveTime += 0.04;
 
-            // 1. Process Node Physics 
+            // 1. Structural Modifiers & Physics
             points.forEach(p => {
                 let targetX = p.origX;
                 let targetY = p.origY;
 
-                // Grab logic: Pull node targets toward cursor ONLY if click is held down
+                // Mode: Sinusoidal Matrix Waves
+                if (activeMode === 'wave') {
+                    targetY += Math.sin(p.col * 0.2 + waveTime) * 15;
+                    targetX += Math.cos(p.row * 0.2 + waveTime) * 15;
+                } 
+                // Mode: High Frequency Brownian Hacker Jitter
+                else if (activeMode === 'random') {
+                    targetX += Math.sin(p.seed + waveTime * 5) * 4;
+                    targetY += Math.cos(p.seed + waveTime * 5) * 4;
+                }
+
+                // Dragging & Grabbing Interactions
                 if (mouse.isPressed && mouse.x !== null && mouse.y !== null) {
                     const dx = p.x - mouse.x;
                     const dy = p.y - mouse.y;
                     const dist = Math.hypot(dx, dy);
 
                     if (dist < mouse.radius) {
-                        const pullStrength = (mouse.radius - dist) / mouse.radius;
-                        // Linearly pulls points directly into the cursor coordinates based on proximity
-                        targetX += (mouse.x - p.x) * pullStrength * 0.85;
-                        targetY += (mouse.y - p.y) * pullStrength * 0.85;
+                        const pull = (mouse.radius - dist) / mouse.radius;
+                        targetX += (mouse.x - p.x) * pull * 0.85;
+                        targetY += (mouse.y - p.y) * pull * 0.85;
                     }
                 }
 
-                // Spring physics formulas to pull deformed grids back into normal alignment
-                const springForceX = (targetX - p.x) * 0.07;
-                const springForceY = (targetY - p.y) * 0.07;
-
-                p.vx += springForceX;
-                p.vy += springForceY;
-
-                // Apply drag friction to prevent infinite shaking/wobbles
+                p.vx += (targetX - p.x) * 0.07;
+                p.vy += (targetY - p.y) * 0.07;
                 p.vx *= 0.82;
                 p.vy *= 0.82;
-
                 p.x += p.vx;
                 p.y += p.vy;
             });
 
-            // 2. Draw Wireframe Layout lines
+            // 2. Render Grid Links
             ctx.lineWidth = 1.0;
             for (let i = 0; i < points.length; i++) {
                 const p = points[i];
 
-                // Right horizontal grid lines
                 if (p.col < cols - 1 && points[i + 1]) {
-                    ctx.strokeStyle = getLineStyle(p, points[i + 1]);
-                    ctx.beginPath();
-                    ctx.moveTo(p.x, p.y);
-                    ctx.lineTo(points[i + 1].x, points[i + 1].y);
-                    ctx.stroke();
+                    ctx.strokeStyle = getDynamicLineStyle(p, points[i + 1]);
+                    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(points[i + 1].x, points[i + 1].y); ctx.stroke();
                 }
-
-                // Vertical bottom grid lines
                 if (p.row < rows - 1 && points[i + cols]) {
-                    ctx.strokeStyle = getLineStyle(p, points[i + cols]);
-                    ctx.beginPath();
-                    ctx.moveTo(p.x, p.y);
-                    ctx.lineTo(points[i + cols].x, points[i + cols].y);
-                    ctx.stroke();
+                    ctx.strokeStyle = getDynamicLineStyle(p, points[i + cols]);
+                    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(points[i + cols].x, points[i + cols].y); ctx.stroke();
                 }
             }
 
-            // 3. Highlight Node Corners
-            points.forEach(p => {
-                let tensionAlpha = 0.25;
-                if (mouse.isPressed && mouse.x !== null && mouse.y !== null) {
-                    const dist = Math.hypot(p.x - mouse.x, p.y - mouse.y);
-                    if (dist < mouse.radius) {
-                        tensionAlpha = 0.9 - (dist / mouse.radius) * 0.6;
-                    }
-                }
-
+            // 3. Render Virtual Custom Hidden Mouse Indicator
+            if (mouse.x !== null && mouse.y !== null) {
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, tensionAlpha > 0.4 ? 2.5 : 1.2, 0, Math.PI * 2);
-                ctx.fillStyle = tensionAlpha > 0.4 ? '#ffffff' : `rgba(255, 140, 0, ${tensionAlpha})`;
+                ctx.arc(mouse.x, mouse.y, mouse.isPressed ? 6 : 4, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = `rgb(${globalColor.r}, ${globalColor.g}, ${globalColor.b})`;
                 ctx.fill();
-            });
+                ctx.shadowBlur = 0; // Reset canvas blur cache instantly
+            }
 
             requestAnimationFrame(animate);
         }
 
-        // Helper to adjust color tension on individual grid strands
-        function getLineStyle(p1, p2) {
-            let baseAlpha = 0.15; // Unmodified background opacity state
-
+        function getDynamicLineStyle(p1, p2) {
+            let baseAlpha = 0.15;
             if (mouse.isPressed && mouse.x !== null && mouse.y !== null) {
                 const midX = (p1.x + p2.x) / 2;
                 const midY = (p1.y + p2.y) / 2;
@@ -172,11 +222,14 @@
 
                 if (dist < mouse.radius) {
                     const factor = 1 - (dist / mouse.radius);
-                    // Shifts color lines from dark orange to a hot glowing amber/white line matrix
-                    return `rgba(255, ${130 + Math.floor(factor * 125)}, ${Math.floor(factor * 200)}, ${0.15 + factor * 0.65})`;
+                    // Dynamically blend custom matrix color coordinates up toward high intensity white strings on strain vectors
+                    const r = Math.min(255, globalColor.r + Math.floor(factor * (255 - globalColor.r)));
+                    const g = Math.min(255, globalColor.g + Math.floor(factor * (255 - globalColor.g)));
+                    const b = Math.min(255, globalColor.b + Math.floor(factor * (255 - globalColor.b)));
+                    return `rgba(${r}, ${g}, ${b}, ${0.15 + factor * 0.65})`;
                 }
             }
-            return `rgba(255, 120, 0, ${baseAlpha})`;
+            return `rgba(${globalColor.r}, ${globalColor.g}, ${globalColor.b}, ${baseAlpha})`;
         }
 
         animate();
