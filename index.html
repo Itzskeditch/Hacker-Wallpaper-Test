@@ -3,15 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Hacker Background</title>
+    <title>3D Plexus Cyber Landscape</title>
     <style>
         body, html {
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #000;
+            background-color: #030812; /* Deep cyber dark background */
             height: 100%;
-            font-family: monospace;
         }
         canvas {
             display: block;
@@ -20,115 +19,165 @@
             left: 0;
             z-index: 1;
         }
-        /* Content overlays cleanly on top of the hacker canvas */
-        .content {
+        .interface {
             position: relative;
             z-index: 2;
-            color: #00ff00;
+            color: #ff9100;
+            font-family: 'Courier New', Courier, monospace;
             text-align: center;
-            top: 40%;
-            text-shadow: 0 0 10px #00ff00;
-            pointer-events: none; /* Allows mouse to pass through to the canvas */
+            top: 15%;
+            pointer-events: none;
+            text-shadow: 0 0 8px #ff7b00;
         }
     </style>
 </head>
 <body>
 
-    <div class="content">
-        <h1>SYSTEM INTRUSION DETECTED</h1>
-        <p>Move your mouse to disrupt the digital stream...</p>
+    <div class="interface">
+        <h2>CYBER LAYER CONNECTIONS ACTIVE</h2>
+        <p>Hover to distort the grid mesh topology...</p>
     </div>
 
-    <canvas id="matrixCanvas"></canvas>
+    <canvas id="networkCanvas"></canvas>
 
     <script>
-        const canvas = document.getElementById('matrixCanvas');
+        const canvas = document.getElementById('networkCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Make canvas full screen
-        function resizeCanvas() {
+        function resize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
         }
-        resizeCanvas();
-        window.addEventListener('resize', resizeCanvas);
+        resize();
+        window.addEventListener('resize', resize);
 
-        // Hacker characters (Binary & Katakana mix)
-        const katakana = "ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ10";
-        const alphabet = katakana.split("");
+        // Network Configuration
+        const points = [];
+        const cols = 26; // Grid columns
+        const rows = 18; // Grid rows
+        const spacingX = canvas.width / (cols - 1);
+        const spacingY = canvas.height / (rows - 1);
 
-        const fontSize = 16;
-        let columns = canvas.width / fontSize;
-
-        // Track drop positions for each column
-        const rainDrops = [];
-        for (let x = 0; x < columns; x++) {
-            rainDrops[x] = 1;
-        }
-
-        // Track Mouse Position
-        const mouse = { x: undefined, y: undefined, radius: 100 };
-        window.addEventListener('mousemove', (event) => {
-            mouse.x = event.clientX;
-            mouse.y = event.clientY;
+        // Mouse settings
+        const mouse = { x: null, y: null, radius: 160 };
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
         });
-
-        // Clear mouse position when it leaves the screen
         window.addEventListener('mouseleave', () => {
-            mouse.x = undefined;
-            mouse.y = undefined;
+            mouse.x = null;
+            mouse.y = null;
         });
 
-        function draw() {
-            // Semi-transparent black clear to create a trailing/fade effect
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            ctx.font = fontSize + 'px monospace';
-
-            for (let i = 0; i < rainDrops.length; i++) {
-                // Determine the X and Y coordinate of the text drop
-                const textX = i * fontSize;
-                const textY = rainDrops[i] * fontSize;
-
-                // Randomly pick a character
-                const text = alphabet[Math.floor(Math.random() * alphabet.length)];
-
-                // INTERACTIVE MOUSE LOGIC:
-                // Check distance between the current code drop and the user's mouse cursor
-                if (mouse.x !== undefined && mouse.y !== undefined) {
-                    const dx = textX - mouse.x;
-                    const dy = textY - mouse.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-
-                    // If the code is near the mouse, glow bright blue/white and speed up
-                    if (distance < mouse.radius) {
-                        ctx.fillStyle = '#00ffff'; // Electric cyan highlight
-                        ctx.shadowBlur = 15;
-                        ctx.shadowColor = '#00ffff';
-                    } else {
-                        ctx.fillStyle = '#0F0'; // Standard Matrix green
-                        ctx.shadowBlur = 0;
-                    }
-                } else {
-                    ctx.fillStyle = '#0F0';
-                    ctx.shadowBlur = 0;
-                }
-
-                ctx.fillText(text, textX, textY);
-
-                // Reset drop to the top if it hits the bottom, or randomly to scatter them
-                if (textY > canvas.height && Math.random() > 0.975) {
-                    rainDrops[i] = 0;
-                }
-
-                // Move the drop down the screen
-                rainDrops[i]++;
+        // Initialize node coordinates to form a 3D wave plane look
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                // Base coordinates
+                const baseX = c * spacingX;
+                // Skewing the rows downwards slightly creates a depth perspective layout
+                const baseY = r * spacingY + (Math.sin(c * 0.5) * 20); 
+                
+                points.push({
+                    x: baseX,
+                    y: baseY,
+                    baseX: baseX,
+                    baseY: baseY,
+                    // Phase offset for organic slow idle wave motion
+                    phase: Math.random() * Math.PI * 2,
+                    speed: 0.02 + Math.random() * 0.02
+                });
             }
         }
 
-        // Run the animation loop at roughly 30 FPS
-        setInterval(draw, 33);
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 1. Update Positions (Wavy idle behavior + Mouse manipulation)
+            points.forEach(p => {
+                p.phase += p.speed;
+                // Idle background breathing movement
+                let targetX = p.baseX + Math.sin(p.phase) * 6;
+                let targetY = p.baseY + Math.cos(p.phase) * 12;
+
+                // Mouse Interaction Logic: Push nodes away or pull them down
+                if (mouse.x !== null && mouse.y !== null) {
+                    const dx = targetX - mouse.x;
+                    const dy = targetY - mouse.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < mouse.radius) {
+                        const force = (mouse.radius - dist) / mouse.radius;
+                        // Magnifies node shift direction relative to your pointer position
+                        targetX += (dx / dist) * force * 35;
+                        targetY += (dy / dist) * force * 45;
+                    }
+                }
+
+                // Smooth out calculation shifts
+                p.x += (targetX - p.x) * 0.1;
+                p.y += (targetY - p.y) * 0.1;
+            });
+
+            // 2. Draw Network Lines (Connecting nodes horizontally and vertically)
+            ctx.lineWidth = 1.2;
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const i = r * cols + c;
+
+                    // Connect to adjacent node on the right
+                    if (c < cols - 1) {
+                        drawMeshLine(points[i], points[i + 1]);
+                    }
+                    // Connect to adjacent node underneath
+                    if (r < rows - 1) {
+                        drawMeshLine(points[i], points[i + cols]);
+                    }
+                }
+            }
+
+            // 3. Draw Nodes (Glow points)
+            points.forEach(p => {
+                let isGlowing = false;
+                if (mouse.x !== null && mouse.y !== null) {
+                    const dist = Math.hypot(p.x - mouse.x, p.y - mouse.y);
+                    if (dist < mouse.radius) isGlowing = true;
+                }
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, isGlowing ? 4 : 2, 0, Math.PI * 2);
+                // Glow fields match the orange/amber highlights of the image
+                ctx.fillStyle = isGlowing ? '#ffae00' : '#d16a00';
+                ctx.shadowBlur = isGlowing ? 12 : 0;
+                ctx.shadowColor = '#ff8800';
+                ctx.fill();
+            });
+            
+            ctx.shadowBlur = 0; // Reset canvas glow states
+            requestAnimationFrame(animate);
+        }
+
+        function drawMeshLine(p1, p2) {
+            let proximityAlpha = 0.12; // Dim default grid line opacity
+            
+            if (mouse.x !== null && mouse.y !== null) {
+                const midX = (p1.x + p2.x) / 2;
+                const midY = (p1.y + p2.y) / 2;
+                const dist = Math.hypot(midX - mouse.x, midY - mouse.y);
+                
+                if (dist < mouse.radius) {
+                    // Lines flare up explicitly if they approach the pointer
+                    proximityAlpha = 0.65 - (dist / mouse.radius) * 0.5;
+                }
+            }
+
+            ctx.strokeStyle = `rgba(255, 136, 0, ${proximityAlpha})`;
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+        }
+
+        animate();
     </script>
 </body>
 </html>
